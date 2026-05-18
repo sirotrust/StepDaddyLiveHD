@@ -4,4 +4,4 @@ httpx==0.28.1
 python-dateutil==2.9.0
 fastapi==0.118.0
 pydantic==2.9.2
-sqlmodel==0.0.22
+sqlmodel==0.0.24
