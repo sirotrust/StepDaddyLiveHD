@@ -27,7 +27,10 @@ RUN reflex init
 # Copy local context to `/app` inside container (see .dockerignore)
 COPY . .
 
-ARG PORT API_URL PROXY_CONTENT SOCKS5
+ARG PORT
+ARG API_URL
+ARG PROXY_CONTENT
+ARG SOCKS5
 # Download other npm dependencies and compile frontend
 RUN REFLEX_API_URL=${API_URL:-http://localhost:$PORT} reflex export --loglevel debug --frontend-only --no-zip && mv .web/build/client/* /srv/ && rm -rf .web
 
@@ -38,7 +41,8 @@ FROM python:3.13-slim
 # Install Caddy and redis server inside image
 RUN apt-get update -y && apt-get install -y caddy redis-server && rm -rf /var/lib/apt/lists/*
 
-ARG PORT API_URL
+ARG PORT
+ARG API_URL
 ENV PATH="/app/.venv/bin:$PATH" PORT=$PORT REFLEX_API_URL=${API_URL:-http://localhost:$PORT} REDIS_URL=redis://localhost PYTHONUNBUFFERED=1 PROXY_CONTENT=${PROXY_CONTENT:-TRUE} SOCKS5=${SOCKS5:-""}
 
 WORKDIR /app
