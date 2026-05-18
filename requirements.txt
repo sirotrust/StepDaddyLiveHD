@@ -1,8 +1,7 @@
 reflex==0.8.13
 curl-cffi==0.13.0
-httpx[http2]==0.28.1
+httpx==0.28.1
 python-dateutil==2.9.0
 fastapi==0.118.0
-reflex==0.5.8
-sqlmodel==0.0.22
 pydantic==2.9.2
+sqlmodel==0.0.22
