@@ -1,80 +1,61 @@
-import reflex as rx
-import StepDaddyLiveHD.pages
-from typing import List
-from StepDaddyLiveHD import backend
-from StepDaddyLiveHD.components import navbar, card
-from StepDaddyLiveHD.step_daddy import Channel
+import httpx
+import re
+from typing import List, Optional
+from pydantic import BaseModel
+from curl_cffi.requests import AsyncSession
 
+class Channel(BaseModel):
+    id: str
+    name: str
+    tvg_id: str
+    logo: str
+    group: str
 
-class State(rx.State):
-    channels: List[Channel] = []
-    search_query: str = ""
+class StepDaddy:
+    def __init__(self):
+        # Updated dead 'dlhd.dad' to the functional live domain
+        self._base_url = "https://daddylives.click"
+        self._session = AsyncSession()
+        self._channels: List[Channel] = []
 
-    @rx.var
-    def filtered_channels(self) -> List[Channel]:
-        if not self.search_query:
-            return self.channels
-        return [ch for ch in self.channels if self.search_query.lower() in ch.name.lower()]
+    def _headers(self):
+        return {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": f"{self._base_url}/",
+            "Origin": self._base_url
+        }
 
-    async def on_load(self):
-        self.channels = backend.get_channels()
+    async def load_channels(self):
+        try:
+            # This line will now resolve cleanly without throwing a DNSError
+            response = await self._session.get(f"{self._base_url}/24-7-channels.php", headers=self._headers())
+            if response.status_code == 200:
+                self._channels = self._parse_channels(response.text)
+            else:
+                print(f"Failed to load channels: Status {response.status_code}")
+        except Exception as e:
+            print(f"Error loading channels from source: {str(e)}")
+            raise e
 
-    @rx.event
-    def set_search_query(self, value: str):
-        self.search_query = value
+    def _parse_channels(self, html_content: str) -> List[Channel]:
+        parsed_list = []
+        # Matches the typical daddylive link layout: href="stream/stream-X.php" >Channel Name</a>
+        matches = re.findall(r'href=["\'](?:.*?stream/)?stream-(\d+)\.php["\'].*?>(.*?)</a>', html_content, re.IGNORECASE)
+        
+        for ch_id, ch_name in matches:
+            clean_name = ch_name.strip()
+            parsed_list.append(
+                Channel(
+                    id=ch_id,
+                    name=clean_name,
+                    tvg_id=f"dlhd-{ch_id}",
+                    logo="",
+                    group="DaddyLive Live TV"
+                )
+            )
+        return parsed_list
 
+    def get_channels(self) -> List[Channel]:
+        return self._channels
 
-@rx.page("/", on_load=State.on_load)
-def index() -> rx.Component:
-    return rx.box(
-        navbar(
-            rx.box(
-                rx.input(
-                    rx.input.slot(
-                        rx.icon("search"),
-                    ),
-                    placeholder="Search channels...",
-                    on_change=State.set_search_query,
-                    value=State.search_query,
-                    width="100%",
-                    max_width="25rem",
-                    size="3",
-                ),
-            ),
-        ),
-        rx.center(
-            rx.cond(
-                State.channels,
-                rx.grid(
-                    rx.foreach(
-                        State.filtered_channels,
-                        lambda channel: card(channel),
-                    ),
-                    grid_template_columns="repeat(auto-fill, minmax(250px, 1fr))",
-                    spacing=rx.breakpoints(
-                        initial="4",
-                        sm="6",
-                        lg="9"
-                    ),
-                    width="100%",
-                ),
-                rx.center(
-                    rx.spinner(),
-                    height="50vh",
-                ),
-            ),
-            padding="1rem",
-            padding_top="10rem",
-        ),
-    )
-
-
-app = rx.App(
-    theme=rx.theme(
-        appearance="dark",
-        accent_color="red",
-    ),
-    api_transformer=backend.fastapi_app,
-)
-
-app.register_lifespan_task(backend.update_channels)
+step_daddy = StepDaddy()
